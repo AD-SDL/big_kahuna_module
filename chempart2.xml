@@ -1,0 +1,18 @@
+		<Symyx.AutomationStudio.Core.ChemicalManager.Chemical>
+			<Name><!-- Name --></Name>
+			<AmountLeft>-1</AmountLeft>
+			<Color>-16776961</Color>
+			<Column>1</Column>
+			<Columns>1</Columns>
+			<Empty>False</Empty>
+			<Questionable>False</Questionable>
+			<Row>1</Row>
+			<Rows>1</Rows>
+			<Size>-1</Size>
+			<SubstratePosition><!-- SubstratePosition --></SubstratePosition>
+			<SubstrateType><!-- SubstrateType --></SubstrateType>
+			<Type>stNormal</Type>
+			<ValveResource />
+			<ValvePosition>0</ValvePosition>
+			<Units>undefined</Units>
+		</Symyx.AutomationStudio.Core.ChemicalManager.Chemical>
