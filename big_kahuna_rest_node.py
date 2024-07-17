@@ -11,10 +11,10 @@ from fastapi.datastructures import State
 from wei.modules.rest_module import RESTModule
 from wei.types import StepFileResponse, StepResponse, StepStatus
 from wei.types.module_types import (
-    LocalFileModuleActionResult,
+  
     Location,
     ModuleState,
-    ValueModuleActionResult,
+ 
 )
 from wei.types.step_types import ActionRequest
 
@@ -79,7 +79,6 @@ def run_experiment(
     # Handle changes to the state of the instrument
     while True:
         next_state = as10.WaitNextState(as_client, last_state, 1)
-        
         if next_state != as10.wait_timeout:
             # If "WaitNextState" did not timeout then the state has changed
             last_state = next_state
@@ -89,6 +88,7 @@ def run_experiment(
             elif last_state == as10.active_prompt_state:
                 # This client could now check what the prompt is and potentially handle it
                 prompt_content = as10.GetActivePromptMessage(as10.GetActivePrompt(as_client))
+                print(as10.GetActivePrompt(as_client))
                 print("The AS10 user interface has displayed a prompt and needs attention: " + prompt_content)
             elif last_state == as10.paused_state:
                 print("The user has paused the experiment")
@@ -100,16 +100,116 @@ def run_experiment(
     final_status = as10.GetStatusContent(as_client)
     if final_status == "Experiment completed":
         print("The experiment has completed")
-        return StepStatus.step_succeeded()
+        return StepResponse.step_succeeded("test")
     elif final_status == "Experiment aborted":
         print("The experiment was aborted")
-        return StepStatus.step_failed()
+        return StepResponse.step_failed()
     else:
         print("Unexpected final status: " + final_status)
-        StepStatus.step_failed()
+        StepResponse.step_failed()
+
+@bk_rest_node.action()
+def run_experiment_to_pause(
+    state: State,
+    action: ActionRequest,
+    design_id: Annotated[int, "The experiment design to run"],
+    prompts_path: Annotated[str, "The prompts file to use"],
+    chem_path: Annotated[str, "The chem file to use"],
+    tip_manager_path: Annotated[str, "The chem file to use"] = None,
+
+) -> StepResponse:
+    """runs a pre-configured experiment"""
+    # Write the temporary files (chemical manager and prompts)
+    
+    
+    # Start the run via AS10 API
+    as_client =state.as_client
+    last_state = as10.RunAS(as_client, design_id, prompts_path, chem_path, tip_manager_path)
+    
+    print("Run started, waiting for completion")
+    
+    # Handle changes to the state of the instrument
+    while True:
+        next_state = as10.WaitNextState(as_client, last_state, 1)
+        if next_state != as10.wait_timeout:
+            # If "WaitNextState" did not timeout then the state has changed
+            last_state = next_state
+            
+            if last_state == as10.no_tips_state:
+                print("The instrument is out of tips and needs attention, please check the AS10 user interface")
+            elif last_state == as10.active_prompt_state:
+                # This client could now check what the prompt is and potentially handle it
+                prompt_content = as10.GetActivePromptMessage(as10.GetActivePrompt(as_client))
+                print(as10.GetActivePrompt(as_client))
+                print("The AS10 user interface has displayed a prompt and needs attention: " + prompt_content)
+                break
+            elif last_state == as10.paused_state:
+                print("The user has paused the experiment")
+                break
+            elif last_state == as10.running_state:
+                print("The experiment has resumed")
+            elif last_state == as10.stopped_state:
+                break
+
+    final_status = as10.GetStatusContent(as_client)
+    return StepResponse.step_succeeded("test")
+    if final_status == "Experiment completed":
+        print("The experiment has completed")
+        return StepResponse.step_succeeded("test")
+    elif final_status == "Experiment aborted":
+        print("The experiment was aborted")
+        return StepResponse.step_failed("test")
+    else:
+        print("Unexpected final status: " + final_status)
+        StepResponse.step_failed("test")
         
     # Clean up temporary files
+@bk_rest_node.action()
+def resume(
+    state: State,
+    action: ActionRequest,
 
+) -> StepResponse:
+    """runs a pre-configured experiment"""
+    # Write the temporary files (chemical manager and prompts)
+    
+    
+    # Start the run via AS10 API
+    as_client =state.as_client
+    as_client.ExperimentStatusService.SetInput("OK")
+    print("Run started, waiting for completion")
+    last_state = as10.GetState(as_client)
+    # Handle changes to the state of the instrument
+    while True:
+        next_state = as10.WaitNextState(as_client, last_state, 1)
+        if next_state != as10.wait_timeout:
+            # If "WaitNextState" did not timeout then the state has changed
+            last_state = next_state
+            
+            if last_state == as10.no_tips_state:
+                print("The instrument is out of tips and needs attention, please check the AS10 user interface")
+            elif last_state == as10.active_prompt_state:
+                # This client could now check what the prompt is and potentially handle it
+                prompt_content = as10.GetActivePromptMessage(as10.GetActivePrompt(as_client))
+                print(as10.GetActivePrompt(as_client))
+                print("The AS10 user interface has displayed a prompt and needs attention: " + prompt_content)
+            elif last_state == as10.paused_state:
+                print("The user has paused the experiment")
+            elif last_state == as10.running_state:
+                print("The experiment has resumed")
+            elif last_state == as10.stopped_state:
+                break
+
+    final_status = as10.GetStatusContent(as_client)
+    if final_status == "Experiment completed":
+        print("The experiment has completed")
+        return StepResponse.step_succeeded("test")
+    elif final_status == "Experiment aborted":
+        print("The experiment was aborted")
+        return StepResponse.step_failed()
+    else:
+        print("Unexpected final status: " + final_status)
+        StepResponse.step_failed()    
 
 
 if __name__ == "__main__":
