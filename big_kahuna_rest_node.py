@@ -163,6 +163,57 @@ def run_experiment_to_pause(
         print("Unexpected final status: " + final_status)
         StepResponse.step_failed("test")
         
+@bk_rest_node.action()
+def run_or_resume_experiment_to_pause(
+    state: State,
+    action: ActionRequest,
+    design_id: Annotated[int, "The experiment design to run"],
+    prompts_path: Annotated[str, "The prompts file to use"],
+    chem_path: Annotated[str, "The chem file to use"],
+    tip_manager_path: Annotated[str, "The chem file to use"] = None,
+
+) -> StepResponse:
+    """runs a pre-configured experiment"""
+    # Write the temporary files (chemical manager and prompts)
+    
+    
+    # Start the run via AS10 API
+    as_client =state.as_client
+    bk_state = as10.GetState(as_client=as_client) 
+    if bk_state == as10.stopped_state:
+        last_state = as10.RunAS(as_client, design_id, prompts_path, chem_path, tip_manager_path)
+    elif bk_state == as10.paused_state:
+        as_client.ExperimentStatusService.SetInput("OK")
+        print("Run started, waiting for completion")
+        last_state = as10.GetState(as_client)
+        print("Run started, waiting for completion")
+    
+    # Handle changes to the state of the instrument
+    while True:
+        next_state = as10.WaitNextState(as_client, last_state, 1)
+        if next_state != as10.wait_timeout:
+            # If "WaitNextState" did not timeout then the state has changed
+            last_state = next_state
+            
+            if last_state == as10.no_tips_state:
+                print("The instrument is out of tips and needs attention, please check the AS10 user interface")
+            elif last_state == as10.active_prompt_state:
+                # This client could now check what the prompt is and potentially handle it
+                prompt_content = as10.GetActivePromptMessage(as10.GetActivePrompt(as_client))
+                print(as10.GetActivePrompt(as_client))
+                print("The AS10 user interface has displayed a prompt and needs attention: " + prompt_content)
+                break
+            elif last_state == as10.paused_state:
+                print("The user has paused the experiment")
+                break
+            elif last_state == as10.running_state:
+                print("The experiment has resumed")
+            elif last_state == as10.stopped_state:
+                break
+
+    final_status = as10.GetStatusContent(as_client)
+    return StepResponse.step_succeeded()
+        
     # Clean up temporary files
 @bk_rest_node.action()
 def resume(
