@@ -2,7 +2,7 @@ from typing import Optional
 import pandas as pd
 from pydantic import BaseModel
 import string
-from big_kahuna_protocol_types import BigKahunaProtocol
+from utils.big_kahuna_protocol_types import BigKahunaProtocol
 class LiquidStep(BaseModel):
     type: str
     location: str

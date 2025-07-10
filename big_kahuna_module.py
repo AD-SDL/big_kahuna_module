@@ -31,6 +31,12 @@ from utils.log_parsing import read_logs, add_timestamps
 
 class BigKahunaConfig(RestNodeConfig):
     """Configuration for a Big Kahuna Node"""
+    dll_path: Path
+    """Path to the LSAPI dll"""
+    main_directory: Path
+    """Directory for Chem and Prompts files"""
+    logs_dir: Path
+    """Path that Automation Studio writes logs to """
     # directory: str
     # resource_server_url: Optional[str]
     # deck_locations: Optional[list[str]]
@@ -67,7 +73,7 @@ class BigKahunaNode(RestNode):
         """generate a library studio protocol"""
         with open(protocol) as f:
             protocol = BigKahunaProtocol.model_validate(json.load(f))
-        library_studio = LS10()
+        library_studio = LS10(self.config.dll_path, self.config.main_directory, self.config.logs_dir)
         library_studio.create_lib(protocol.name)
         library_studio.units = protocol.units
         for parameter in protocol.parameters:

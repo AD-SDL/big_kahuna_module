@@ -6,11 +6,10 @@ import time
 from datetime import datetime
 
 import sila2.client
-from LogReader import AS_log
 
 
 class AS10:  # v is verbosity
-    def __init__(self, verbosity):
+    def __init__(self, logs_dir: str, verbosity):
         # statements
         self.stopped = "Stopped"
         self.aborted = "Aborted"
@@ -51,10 +50,9 @@ class AS10:  # v is verbosity
         self.option = None  # oprions in the active dialog
 
         # logging
-        self.logs_dir = "C:\Automation Studio\Logs"  # AS logs folder
+        self.logs_dir = logs_dir # AS logs folder
         self.logs = None  # all logs in the folder
         self.log = None  # the last log
-        self.asl = AS_log()
         self.record = None  # file for status statements
         self.dir = ""  # promptsfile folder
         self.normal_response = json.loads(
@@ -95,7 +93,7 @@ class AS10:  # v is verbosity
         copy_from = os.path.join(self.logs_dir, self.log)
         copy_to = os.path.join(folder, self.log)
         shutil.copy2(copy_from, copy_to)
-        self.asl.process_log(copy_to)
+        
 
     def checkResult(self, response):
         response = json.loads(response)

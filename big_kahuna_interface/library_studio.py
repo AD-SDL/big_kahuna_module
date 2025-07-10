@@ -12,7 +12,7 @@ from glob import glob
 from datetime import datetime
 import xml.etree.ElementTree as ET
 from lxml import etree
-import pathlib
+from pathlib import Path
 
 from System.Reflection import Assembly, ReflectionTypeLoadException  # type: ignore
 import System  # type: ignore
@@ -22,13 +22,13 @@ clr.AddReference("System.Drawing")
 from System.Drawing import Point  # type: ignore
 
 
-from automation_studio import AS10
+from big_kahuna_interface.automation_studio import AS10
 
 
 def CustomVerbosity():  # 1 for verbose script
     return 1
 
-library_path = pathlib.Path(__file__).parent
+library_path = Path(__file__).parent
 class CustomUtils:  # common LS handling utilities
     def __init__(self):
         self.wells = []
@@ -119,7 +119,7 @@ class PromptsFile:  # prompt xml file === initial state of well is either "None"
         self.positions = []
 
     def PromptsPart1(self):  # replacement in the exemplar prompt xml file
-        with open(r"xml_files/promptspart1.xml", "r") as file:
+        with open(library_path / r"xml_files/promptspart1.xml", "r") as file:
             data = file.read()
             data = data.replace("<!-- Initial library states -->", self.plates[:-1])
             data = data.replace("<!-- Initial source states -->", self.sources[:-1])
@@ -217,9 +217,10 @@ class ChemFile:  # chemcial manager xml file, consists of four sections that are
 
 
 class LS10:  # LS API wrapper calls
-    def __init__(self):
+    def __init__(self, dll_path: Path, main_dir: Path, logs_dir: Path):
         # general settings
-        self.path = os.getcwd()
+        self.logs_dir = logs_dir
+        self.path = main_dir
         self.chemfile = ChemFile()
         self.promptsfile = PromptsFile()
         self._prompts = library_path / "xml_files/promptsWithDC.xml"
@@ -247,14 +248,6 @@ class LS10:  # LS API wrapper calls
         self.chaser = 0  # chaser volume in uL, 0 is chaser is not used
         self.door = 1  # State of the door interlock, 1 - locked
 
-        self.TAGS = {
-            "skip": "SkipMap",  # short codes for common LS design tags
-            "1tip": "SyringePump,SingleTip",
-            "Etip": "SyringePump,ExtSingleTip",
-            "chaser": "Chaser",
-            "4tip": "4Tip",
-        }
-
         self.PTYPES = [
             "Temperature",
             "Time",
@@ -275,12 +268,12 @@ class LS10:  # LS API wrapper calls
         self.as_pause = None  # pause message
 
         # starting LS APIs
-        ls_path = library_path / "LSAPI.dll"
+        
        
 
-        clr.AddReference(ls_path)
+        clr.AddReference(str(dll_path))
+        assembly = Assembly.LoadFile(str(dll_path))
         # self.inspect_assembly(assembly)   # use to inspect assembly
-        
         import LS_API
 
         self.ls = LS_API.LibraryStudioWrapper
@@ -363,7 +356,7 @@ class LS10:  # LS API wrapper calls
         q = self.van_der_corput(index)
         return self.rgb_to_uint(*self.cmap(1 - q))
 
-    def to_tag(self, tags):  # tag code word to a full tag
+    def to_tag(self, tags): 
         tag_string  = ""
         for tag in tags:
             tag_string += (tag.value)
@@ -443,7 +436,7 @@ class LS10:  # LS API wrapper calls
         ET.SubElement(root, "Units").text = u
 
         tree = ET.ElementTree(root)
-        c = "xml_files/chempart2.xml"
+        c = library_path / "xml_files/chempart2.xml"
         with open(c, "wb") as f:
             tree.write(f, encoding="utf-8", xml_declaration=True)
 
@@ -837,7 +830,7 @@ class LS10:  # LS API wrapper calls
         if self.door == 1:
             print(">> BK door interlocked")
         # AS10 preparations
-        self.as10 = AS10(self.verbose)
+        self.as10 = AS10(str(self.logs_dir), self.verbose)
         if self.as10.FindOrStartAS():
             print(">> AS preparations complete")
             return 1  # succeeded
