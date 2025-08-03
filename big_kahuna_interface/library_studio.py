@@ -224,6 +224,7 @@ class LS10:  # LS API wrapper calls
         self.chemfile = ChemFile()
         self.promptsfile = PromptsFile()
         self._prompts = library_path / "xml_files/promptsWithDC.xml"
+        self._tips = None
           # default for using Design Creator
         self._chem = ""  # default for using Design creator
 

@@ -9,7 +9,7 @@ import sila2.client
 
 
 class AS10:  # v is verbosity
-    def __init__(self, logs_dir: str, verbosity):
+    def __init__(self, logs_dir: str, verbosity: bool):
         # statements
         self.stopped = "Stopped"
         self.aborted = "Aborted"

@@ -23,6 +23,7 @@ from madsci.common.types.resource_types.definitions import ContinuousConsumableR
 from utils.big_kahuna_protocol_types import BigKahunaPlate, BigKahunaProtocol, BigKahunaAction
 from madsci.client.resource_client import ResourceClient
 from big_kahuna_interface.library_studio import LS10
+from big_kahuna_interface.automation_studio import AS10
 import os
 from pathlib import Path
 from utils.log_parsing import read_logs, add_timestamps
@@ -50,20 +51,17 @@ class BigKahunaNode(RestNode):
 
     config_model = BigKahunaConfig
     def startup_handler(self):
-        pass
-        # if self.config.resource_server_url:
-        #     self.resource_client = ResourceClient(self.config.resource_server_url)
-        #     self.resource_owner = OwnershipInfo(node_id=self.node_definition.node_id)
-        #     for location in self.config.deck_locations:
-        #         rec_def = SlotResourceDefinition(
-        #             resource_name= self.config.node_name + "_" + location,
-        #             owner=self.resource_owner,
-        #         )
+       self.automation_studio = AS10(logs_dir=self.config.logs_dir, verbosity=True)
+       self.automation_studio.FindOrStartAS()
 
-        #         self.resource_client.init_resource(rec_def)
-        #     for source in self.config.chemical_sources:
-        #         source.owner = self.resource_owner
-        #         self.resource_client.init_resource(source)
+    def state_handler(self):
+        experiment_status = self.automation_studio.client.ExperimentStatusService.GetExperimentStatus().ReturnValue
+        experiment_status = json.loads(experiment_status)
+        self.node_state = {"experiment_status": experiment_status}
+
+    def shutdown_handler(self):
+        self.automation_studio.CloseAS()
+
             
     @action
     def run_protocol(
@@ -90,10 +88,9 @@ class BigKahunaNode(RestNode):
         for protocol_action in protocol.actions:
             self.add_step(protocol_action, library_studio, protocol.plates)
         library_studio.finish(protocol.plates)
-        library_studio.as_prep()
-        success = library_studio.as_execute()
+        success = self.automation_studio.run(library_studio.ID, library_studio._prompts, library_studio._chem, library_studio._tips)
         if success:
-            file_path = os.path.join(library_studio.as10.logs_dir,library_studio.as10.log)
+            file_path = os.path.join(self.automation_studio.logs_dir,self.automation_studio.log)
             steps = read_logs(file_path)
             stamped_protocol = add_timestamps(steps, protocol)
             steps = [step.model_dump() for step in steps]
@@ -111,6 +108,25 @@ class BigKahunaNode(RestNode):
         #         except Exception as e:
         #             self.logger.error(str(e))
             return ActionSucceeded(files={"log_file": file_path, "action_logs": action_log_path, "protocol": protocol_path})
+        else: 
+          return ActionFailed()
+    @action
+    def run_preloaded_library(
+        self,
+        library_id: int,
+        chemfile: Path,
+        promptsfile: Path
+    ) -> ActionResult:
+        """generate a library studio protocol"""
+        success = self.automation_studio.run(library_id, str(promptsfile), str(chemfile))
+        if success:
+            file_path = os.path.join(self.automation_studio.logs_dir,self.automation_studio.log)
+            steps = read_logs(file_path)
+            action_log_path = "action_logs.json"
+            with open(action_log_path, "w") as f:
+                    json.dump(steps, f)
+
+            return ActionSucceeded(files={"log_file": file_path, "action_logs": action_log_path})
         else: 
           return ActionFailed()
         
