@@ -269,6 +269,34 @@ class AS10:  # v is verbosity
         except Exception as e:
             print("Status content error = %s" % e)
             return None
+    def signal_action(self): # added 7-25-2025
+
+            self.exp_status(0)
+            self.signal_count +=1 
+            self.signal_current = datetime.now()
+
+            print("\n>> AS signal %d for map %d, received %s" % (self.signal_count, 
+                                                                self.map, 
+                                                                self.signal_current))
+
+            if self.signal_last is not None:
+                self.signal_dt = (self.signal_current - self.signal_last).total_seconds() / 60
+                print(">> AS: Last signal pause time interval = %.2f min" % self.signal_dt)
+
+            self.signal_last = self.signal_current
+
+            if self.signal_check and self.signal_accept:
+                if  self.signal_dt > self.signal_accept: # interval between signal pauses exceeds set duration
+                    self.signal_long += 1
+                    print("\n>> CAUTION: pause-to-pause step is taking too long")
+                    message = "Expects %.1f min, step took %.1f min" % (self.signal_accept, self.signal_dt)
+                    print(">> %s" % message)
+                    if self.signal_long > 3:
+                            print("\n>> WARNING: 3 last steps all took too long, alert sent")
+                            #self.alert(subject="BK step takes too long 3 times", body=message, importance="High")
+                            self.signal_accept = None
+                else:
+                    self.signal_long = 0 # null long interval counter
 
     def check_exp_status(self):
         if self.exp_status(0) > self.last_map: # added 7-25-2025
