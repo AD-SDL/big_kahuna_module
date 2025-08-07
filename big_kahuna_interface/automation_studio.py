@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -31,7 +32,16 @@ class AS10:  # v is verbosity
         self.client = None  # SILA client for AutomationClient
         self.start = None
         self.discovery = None  # error message in discovery
-        self.es = None  # Experimental statements
+        self.es =  None   # Experiment Service, changed 7-25-2025
+        self.ess =  None   # Experimental Status Service, changed 7-25-2025
+
+        # state of the experiment, added 7-25-2025
+        self.last_map = 0                   # last queried map
+        self.map =  0                       # current LS map number
+        self.total_maps = 0                 # total # of maps
+        self.description = None             # map description
+        self.current_action = None          # current action
+        self.current_statement = None       # AS GUI rolling statement
 
         # quering
         self.timeout = 5  # sec between the calls
@@ -48,6 +58,17 @@ class AS10:  # v is verbosity
         self.info = None  # information in the active dialog
         self.title = None  # title of the active dialog
         self.option = None  # oprions in the active dialog
+        # added 7-19-2025, checking time interval between the pauses
+        self.signal_check = False             # test pause
+        self.signal_code = 2000               # integer fixed code base (Send signal, wait for response => see CustomService codebook)
+        self.signal_map = -1                  # map number before pause
+        self.signal_accept = None             # criterion of acceptance, e.g. time interval between the pauses
+        self.signal_last = None               # last code pause timestamp
+        self.signal_current = None            # current code pause timestamp
+        self.signal_dt = 0                    # last pause-to-pause interval
+        self.signal_count = 0                 # signal count
+        self.signal_long = 0                  # count of long pause-topause intervals
+        self.signal_word = 31415              # code word in CurrentStatement to trigger signal action
 
         # logging
         self.logs_dir = logs_dir # AS logs folder
@@ -152,6 +173,7 @@ class AS10:  # v is verbosity
             return 1  # failed
         if self.client:
             self.es = self.client.ExperimentService
+            self.ess = self.client.ExperimentStatusService
             return 0  # succeeded
         else:
             return 1  # failed
@@ -233,16 +255,55 @@ class AS10:  # v is verbosity
         return 0
 
     def GetStatusContent(self):
-        try:
-            self.response = json.loads(
-                self.client.ExperimentStatusService.GetStatus().ReturnValue
-            )
-            if self.do_record and self.response != self.normal_response:
+        try: 
+            self.response = json.loads(self.ess.GetStatus().ReturnValue)
+            self.check_exp_status() # added 7-25-2025
+
+            if self.response != self.normal_response and self.do_record:
+                if self.verbose == 2: 
+                    print(self.response) # added 7-22-2025 
                 self.timestamp()
                 self.safe_record("%s %s" % (self.stamp, self.response))
-            return self.response["Content"]
-        except:
+
+            return self.response['Content']
+        except Exception as e:
+            print("Status content error = %s" % e)
             return None
+
+    def check_exp_status(self):
+        if self.exp_status(0) > self.last_map: # added 7-25-2025
+            self.last_map = self.map
+            self.timestamp()
+            self.safe_record("%s %s" % (self.stamp, self.current_statement))
+            if str(self.signal_word) in self.current_statement:
+                self.signal_action()
+
+    def exp_status(self, opt=0):  # get the status of the AS experiment, print if opt=1
+        self.map = 0
+        self.total_maps = 0
+        self.description = None
+
+        r = json.loads(self.ess.GetExperimentStatus().ReturnValue)
+
+        if r and 'Content' in r:
+            c = r["Content"]
+
+            if isinstance(c, dict) and "CurrentAction" in c:
+                self.current_action = c.get("CurrentAction", "")
+                self.current_statement = c.get("CurrentMap", "")
+
+                if "Map" in self.current_statement:
+                    match = re.match(r"Map (\d+) of (\d+):\s*(.+)", self.current_statement)
+                    if match:
+                        try:
+                            self.map = int(match.group(1))
+                            self.total_maps = int(match.group(2))
+                            self.description = match.group(3)
+                            if opt:
+                                print(f"{self.current_action} :: {self.current_statement}")
+                        except: pass
+
+        return self.map
 
     def timestamp(self):
         now = datetime.now()
