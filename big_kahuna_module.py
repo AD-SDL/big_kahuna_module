@@ -122,6 +122,7 @@ class BigKahunaNode(RestNode):
         if success:
             file_path = os.path.join(self.automation_studio.logs_dir,self.automation_studio.log)
             steps = read_logs(file_path)
+            steps = [step.model_dump() for step in steps]
             action_log_path = "action_logs.json"
             with open(action_log_path, "w") as f:
                     json.dump(steps, f)
